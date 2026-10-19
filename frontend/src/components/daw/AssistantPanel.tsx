@@ -68,7 +68,11 @@ export function AssistantPanel({
   const [busy, setBusy] = useState(false);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [analysisKey, setAnalysisKey] = useState("");
-  const [reference, setReference] = useState<{ name: string; audioBase64: string } | null>(null);
+  const [reference, setReference] = useState<{
+    name: string;
+    mimeType: "audio/wav";
+    audioBase64: string;
+  } | null>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const feedRef = useRef<HTMLDivElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
@@ -124,7 +128,11 @@ export function AssistantPanel({
       const context = new AudioContext();
       try {
         const buffer = await context.decodeAudioData(await file.arrayBuffer());
-        setReference({ name: file.name, audioBase64: encodeTrackAudio(buffer) });
+        setReference({
+          name: file.name,
+          mimeType: "audio/wav",
+          audioBase64: encodeTrackAudio(buffer),
+        });
         setReferenceRevision((value) => value + 1);
         setAnalysis(null);
         setAnalysisKey("");
@@ -142,9 +150,7 @@ export function AssistantPanel({
     const text = draft.trim();
     if (!text || busy) return;
     if (!status?.available) {
-      addAssistantError(
-        "The mix assistant is temporarily unavailable. Please try again later.",
-      );
+      addAssistantError("The mix assistant is temporarily unavailable. Please try again later.");
       return;
     }
     if (!tracks.length) {
@@ -286,9 +292,7 @@ export function AssistantPanel({
         <div className="min-w-0 flex-1">
           <div className="text-xs font-medium">Mix assistant</div>
           <div className="text-[9px] tracking-wider text-muted-foreground">
-            {status?.available
-              ? "CONNECTED"
-              : "ASSISTANT STATUS"}
+            {status?.available ? "CONNECTED" : "ASSISTANT STATUS"}
           </div>
         </div>
         {canUndo && !busy && (
