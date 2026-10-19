@@ -22,7 +22,12 @@ const ProjectTrack = z
         duration: z.number().finite().min(0).max(86400),
       })
       .strict(),
-    fx: z.record(z.string(), z.unknown()).refine((value) => Object.keys(value).length <= 80),
+    fx: z
+      .object({})
+      .passthrough()
+      .refine((value) => Object.keys(value).length <= 80, {
+        message: "FX state contains too many parameters.",
+      }),
   })
   .strict();
 const Project = z
