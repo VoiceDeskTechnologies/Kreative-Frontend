@@ -86,6 +86,65 @@ export function registerAccountRoutes(app: FastifyInstance, config: AppConfig, f
     return { isAdmin: Boolean(user?.email_confirmed_at && email && config.ADMIN_EMAILS.has(email)) };
   });
 
+  app.get("/support/unread-count", async (request, reply) => {
+    const user = await requireUser(request, reply, config, fetcher);
+    if (!user) return;
+    try {
+      const response = await supabaseTable(
+        config,
+        fetcher,
+        "support_messages",
+        `?select=id,support_tickets!inner(user_id)&support_tickets.user_id=eq.${encodeURIComponent(user.id)}&sender_role=eq.admin&read_at=is.null`,
+      );
+      return { count: ((await response.json()) as unknown[]).length };
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(502).send({
+        error: "Unable to load support notifications.",
+        code: "SUPPORT_FAILED",
+      });
+    }
+  });
+
+  app.get("/support/tickets", async (request, reply) => {
+    const user = await requireUser(request, reply, config, fetcher);
+    if (!user) return;
+    try {
+      const response = await supabaseTable(
+        config,
+        fetcher,
+        "support_tickets",
+        `?user_id=eq.${encodeURIComponent(user.id)}&select=*&order=updated_at.desc`,
+      );
+      return { tickets: await response.json() };
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(502).send({
+        error: "Unable to load support tickets.",
+        code: "SUPPORT_FAILED",
+      });
+    }
+  });
+
+  app.get("/admin/support", async (request, reply) => {
+    if (!(await requireConfiguredAdmin(request, reply, config, fetcher))) return;
+    try {
+      const response = await supabaseTable(
+        config,
+        fetcher,
+        "support_tickets",
+        "?select=*&order=updated_at.desc&limit=100",
+      );
+      return { tickets: await response.json() };
+    } catch (error) {
+      request.log.error(error);
+      return reply.code(502).send({
+        error: "Unable to load support queue.",
+        code: "SUPPORT_FAILED",
+      });
+    }
+  });
+
   app.get("/admin/overview", async (request, reply) => {
     if (!(await requireConfiguredAdmin(request, reply, config, fetcher))) return;
     try {
