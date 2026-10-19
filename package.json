@@ -1,0 +1,28 @@
+{
+  "name": "kreative-ai-mixing-mastering",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.3",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "overrides": {
+    "rolldown": "1.2.1"
+  },
+  "scripts": {
+    "dev": "bun run --filter @kreative/frontend dev",
+    "dev:backend": "bun run --filter @kreative/backend dev",
+    "dev:all": "bun run --filter '*' --parallel dev",
+    "build": "bun run --filter @kreative/frontend build && bun run --filter @kreative/backend build",
+    "build:frontend": "bun run --filter @kreative/frontend build",
+    "build:backend": "bun run --filter @kreative/backend build",
+    "start:backend": "bun run --filter @kreative/backend start",
+    "lint": "bun run --filter @kreative/frontend lint",
+    "typecheck": "bun run --filter @kreative/frontend typecheck && bun run --filter @kreative/backend typecheck",
+    "test": "bun run --filter @kreative/frontend test && bun run --filter @kreative/backend test"
+  }
+}
