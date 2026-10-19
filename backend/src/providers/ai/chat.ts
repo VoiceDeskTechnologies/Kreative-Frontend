@@ -47,13 +47,24 @@ function parsePlan(content: string): AiMixPlan {
   try {
     value = JSON.parse(text);
   } catch (error) {
-    throw new AiProviderError(
-      "The AI provider returned a response that was not valid JSON.",
-      502,
-      {
-        cause: error,
-      },
-    );
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) {
+      throw new AiProviderError(
+        "The AI provider returned a response that was not valid JSON.",
+        502,
+        { cause: error },
+      );
+    }
+    try {
+      value = JSON.parse(text.slice(start, end + 1));
+    } catch (fallbackError) {
+      throw new AiProviderError(
+        "The AI provider returned a response that was not valid JSON.",
+        502,
+        { cause: fallbackError },
+      );
+    }
   }
   const parsed = AiMixPlanSchema.safeParse(value);
   if (!parsed.success) {
