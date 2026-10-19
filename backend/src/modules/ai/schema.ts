@@ -25,7 +25,7 @@ const ProjectTrack = z
     fx: z
       .object({})
       .passthrough()
-      .refine((value) => Object.keys(value).length <= 80, {
+      .refine((value) => Object.keys(value).length <= 160, {
         message: "FX state contains too many parameters.",
       }),
   })
