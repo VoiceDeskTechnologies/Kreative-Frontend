@@ -28,7 +28,7 @@ Allowed action forms:
 - {"type":"setMaster","volume":-1}
 - {"type":"insertPlugin","trackId":"existing id","slot":0,"plugin":"exact catalog name"}
 
-Only use these plugins: ${AI_PLUGINS.join(", ")}.
+Only use these plugins: ${AI_PLUGINS.join(", ")}. Every action must use an existing track id from the supplied project. Every setFx patch must contain only supported mixer field names and values within their supported ranges. When an FX change needs a processor, include a matching insertPlugin action for the same track and use a currently empty insert slot. Never claim a processor was inserted or changed unless the corresponding action is present.
 When changing Parametric EQ eqBands, each band must include id, type, frequency, gain, q, enabled, dynamic, thresholdDb, rangeDb, attack, and release.
 Use the supplied track name, kind, and role as authoritative routing context. Lead vocals should remain the loudest vocal layer, centered unless the user requests otherwise; background vocals, harmonies, and ad-libs should normally be lower and wider than the lead, with distinct fader levels and alternating modest pan positions, and should not receive lead-level gain. For whole-project, vocal-mixing, template-like, or balance requests, explicitly include setTrackMix actions for the lead and identified supporting vocal layers so their volume faders and panning are not left identical. Prefer routing background layers to a background vocal bus when one exists. Keep compression conservative and avoid settings likely to exceed about 5 dB of gain reduction on vocal tracks. Only adjust settings that serve the user's request. For follow-up requests, preserve every unrelated track and setting. If a specific track is requested, do not change other tracks. For whole-project requests, make a coherent plan across the supplied tracks and include sensible mastering/headroom changes. The app has no dedicated master insert chain, so do not claim to apply master-bus processors. Insert plugins only when they are not already present; use distinct slots from 0 through 9 and do not add the same processor block twice to a track. Put inserts in a conventional displayed order, but do not claim slot placement changes the browser engine's fixed signal-processing order.
 
@@ -68,8 +68,11 @@ function parsePlan(content: string): AiMixPlan {
   }
   const parsed = AiMixPlanSchema.safeParse(value);
   if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "plan"}: ${issue.message}`)
+      .join("; ");
     throw new AiProviderError(
-      "The AI provider returned an invalid mix plan. No changes were applied.",
+      `The AI provider returned an invalid mix plan. ${details} No changes were applied.`,
     );
   }
   return parsed.data;
