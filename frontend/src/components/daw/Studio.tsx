@@ -193,6 +193,7 @@ export function Studio() {
   const [transportLocked, setTransportLocked] = useState(false);
   const [recoveryProject, setRecoveryProject] = useState<KreativeProjectFile | null>(null);
   const sessionHydrated = useRef(false);
+  const autosaveDisabled = useRef(false);
   const [rightPanelCollapsed, setRightPanelCollapsed] = useState(false);
   const [renamingTrackId, setRenamingTrackId] = useState<string | null>(null);
   const [renameSurface, setRenameSurface] = useState<"workspace" | "mixer" | null>(null);
@@ -631,11 +632,19 @@ export function Studio() {
   }, []);
 
   useEffect(() => {
-    if (!sessionHydrated.current || !tracks.length) return;
+    if (!sessionHydrated.current || !tracks.length || autosaveDisabled.current) return;
     const timer = window.setTimeout(() => {
       void createKreativeProject(projectName, tracks, masterVol, key, bpm)
         .then((project) => sessionStorage.setItem("kreative.session.autosave", JSON.stringify(project)))
-        .catch((error: unknown) => console.error("Couldn't autosave the studio session.", error));
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "QuotaExceededError") {
+            autosaveDisabled.current = true;
+            sessionStorage.removeItem("kreative.session.autosave");
+            toast("This session is too large for automatic recovery. Use Save to preserve the audio.");
+            return;
+          }
+          console.error("Couldn't autosave the studio session.", error);
+        });
     }, 1200);
     return () => window.clearTimeout(timer);
   }, [bpm, key, masterVol, projectName, tracks]);
