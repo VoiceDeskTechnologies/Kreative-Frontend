@@ -65,9 +65,14 @@ export function registerAiRoutes(
   app.post("/ai/analyze", async (request, reply) => {
     const parsed = AiAnalysisRequest.safeParse(request.body);
     if (!parsed.success) {
+      request.log.warn({ issues: parsed.error.issues }, "Invalid audio analysis request");
       return reply.code(400).send({
         error: "Invalid audio analysis request.",
         code: "INVALID_REQUEST",
+        details: parsed.error.issues.map((issue) => ({
+          path: issue.path.join("."),
+          message: issue.message,
+        })),
       });
     }
     if (config.AI_PROVIDER === "none") {

@@ -290,7 +290,7 @@ export const AiAnalysisRequest = z
           .object({
             trackId: TrackId,
             name: z.string().min(1).max(120),
-            mimeType: z.literal("audio/wav"),
+            mimeType: z.literal("audio/wav").default("audio/wav"),
             audioBase64: z.string().min(1).max(12_000_000),
           })
           .strict(),
@@ -300,7 +300,7 @@ export const AiAnalysisRequest = z
     reference: z
       .object({
         name: z.string().min(1).max(120),
-        mimeType: z.literal("audio/wav"),
+        mimeType: z.literal("audio/wav").default("audio/wav"),
         audioBase64: z.string().min(1).max(12_000_000),
       })
       .strict()
