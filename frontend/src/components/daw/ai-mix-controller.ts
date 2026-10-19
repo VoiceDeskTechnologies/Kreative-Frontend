@@ -26,3 +26,23 @@ export function describeAiAction(action: AiMixAction, trackName?: string): strin
   if (action.type === "setTrackMix") return `Balancing ${trackName ?? action.trackId}`;
   return `Inserting ${action.plugin} on ${trackName ?? action.trackId}`;
 }
+
+export function pluginsForFxPatch(patch: Record<string, unknown>): string[] {
+  const keys = new Set(Object.keys(patch));
+  const plugins: string[] = [];
+  if (keys.has("eqBands")) plugins.push("Parametric EQ");
+  if (keys.has("hpOn") || keys.has("hpFreq") || keys.has("lpOn") || keys.has("lpFreq")) {
+    plugins.push("High Pass / Low Pass");
+  }
+  if (Array.from(keys).some((key) => key.startsWith("eq") && key !== "eqBands")) {
+    plugins.push("Four-Band Console EQ");
+  }
+  if (Array.from(keys).some((key) => key.startsWith("comp"))) plugins.push("Studio Compressor");
+  if (Array.from(keys).some((key) => key.startsWith("deEss"))) plugins.push("KREATIVE De-Esser");
+  if (Array.from(keys).some((key) => key.startsWith("smoothen"))) plugins.push("Smoothen");
+  if (Array.from(keys).some((key) => key.startsWith("pitch"))) plugins.push("KREATIVE Pitch");
+  if (keys.has("width") || keys.has("imagerBalance") || keys.has("imagerRotation")) {
+    plugins.push("K1-Imager");
+  }
+  return plugins;
+}

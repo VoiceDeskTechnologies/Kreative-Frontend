@@ -28,8 +28,8 @@ export function compileTemplateTrack(
   return {
     role: definition.role,
     outputBus: definition.outputBus,
-    volume: definition.volume,
-    pan: definition.pan,
+    ...(definition.volume === undefined ? {} : { volume: definition.volume }),
+    ...(definition.pan === undefined ? {} : { pan: definition.pan }),
     sends: definition.sends,
     plugins: definition.plugins.map((item, slot) => {
       if (!getPluginSettings(item.pluginType)) {

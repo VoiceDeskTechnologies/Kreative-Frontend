@@ -51,7 +51,11 @@ import { SettingsModal, type Settings } from "./SettingsModal";
 import { MixerFader } from "./MixerFader";
 import { AssistantPanel } from "./AssistantPanel";
 import type { AiMixAction } from "./ai-mix-types";
-import { describeAiAction, validateAiMixActions } from "./ai-mix-controller";
+import {
+  describeAiAction,
+  pluginsForFxPatch,
+  validateAiMixActions,
+} from "./ai-mix-controller";
 import { InsertPicker, PluginSlots, PluginWindow, type InsertTarget } from "./PluginRack";
 import { AccountMenu } from "./AccountMenu";
 import { TemplateLibrary } from "./TemplateLibrary";
@@ -1465,8 +1469,28 @@ export function Studio() {
         const target = currentTracks[trackIndex]!;
         let updated: TrackState;
         if (action.type === "setFx") {
-          updated = { ...target, fx: { ...target.fx, ...action.patch } };
-          onProgress(index, describeAiAction(action, target.name));
+          const inserts = [...target.inserts];
+          const pluginBypass = { ...target.pluginBypass };
+          const addedPlugins: string[] = [];
+          for (const plugin of pluginsForFxPatch(action.patch)) {
+            const family = getPluginFamily(plugin);
+            if (!family || inserts.some((item) => item && getPluginFamily(item) === family)) continue;
+            const slot = inserts.findIndex((item) => item === null);
+            if (slot < 0) throw new Error(`No insert slot is available on ${target.name}.`);
+            inserts[slot] = plugin;
+            pluginBypass[family] = false;
+            addedPlugins.push(plugin);
+          }
+          updated = {
+            ...target,
+            fx: { ...target.fx, ...action.patch },
+            inserts,
+            pluginBypass,
+          };
+          onProgress(
+            index,
+            `${addedPlugins.length ? `Inserted ${addedPlugins.join(", ")} · ` : ""}${describeAiAction(action, target.name)}`,
+          );
         } else if (action.type === "setTrackMix") {
           updated = {
             ...target,
