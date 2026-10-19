@@ -190,7 +190,28 @@ export function AssistantPanel({
             typeof analysisBody === "object" &&
             "error" in analysisBody &&
             typeof analysisBody.error === "string"
-              ? analysisBody.error
+              ? `${analysisBody.error}${
+                  "details" in analysisBody &&
+                  Array.isArray(analysisBody.details) &&
+                  analysisBody.details.length
+                    ? ` ${analysisBody.details
+                        .map((detail) => {
+                          if (
+                            detail &&
+                            typeof detail === "object" &&
+                            "path" in detail &&
+                            "message" in detail &&
+                            typeof detail.path === "string" &&
+                            typeof detail.message === "string"
+                          ) {
+                            return `${detail.path}: ${detail.message}`;
+                          }
+                          return null;
+                        })
+                        .filter((detail): detail is string => detail !== null)
+                        .join("; ")}`
+                    : ""
+                }`
               : `Audio analysis failed (${analysisResponse.status}).`;
           throw new Error(message);
         }
