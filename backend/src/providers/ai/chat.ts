@@ -262,10 +262,30 @@ async function parseAnalysisResponse(response: Response, provider: string) {
   try {
     value = JSON.parse(text);
   } catch (error) {
-    throw new AiProviderError(`${provider} returned invalid audio analysis JSON.`, 502, { cause: error });
+    const start = text.indexOf("{");
+    const end = text.lastIndexOf("}");
+    if (start < 0 || end <= start) {
+      throw new AiProviderError(`${provider} returned invalid audio analysis JSON.`, 502, {
+        cause: error,
+      });
+    }
+    try {
+      value = JSON.parse(text.slice(start, end + 1));
+    } catch (fallbackError) {
+      throw new AiProviderError(`${provider} returned invalid audio analysis JSON.`, 502, {
+        cause: fallbackError,
+      });
+    }
   }
   const parsed = AiAnalysisSchema.safeParse(value);
-  if (!parsed.success) throw new AiProviderError("The AI provider returned an invalid audio analysis.");
+  if (!parsed.success) {
+    const details = parsed.error.issues
+      .map((issue) => `${issue.path.join(".") || "analysis"}: ${issue.message}`)
+      .join("; ");
+    throw new AiProviderError(
+      `The AI provider returned an invalid audio analysis. ${details}`,
+    );
+  }
   return parsed.data;
 }
 
