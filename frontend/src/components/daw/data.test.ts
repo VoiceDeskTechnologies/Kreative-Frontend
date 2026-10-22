@@ -40,10 +40,10 @@ describe("factory presets", () => {
     expect(getPluginFamily("K-2A")).toBe("compressor");
     expect(getPluginFamily("K-76")).toBe("compressor");
     expect(getPluginFamily("K1-Imager")).toBe("imager");
-    expect(PLUGINS.Dynamics?.map(([name]) => name)).toEqual(
+    expect(PLUGINS["Dynamics"]?.map(([name]) => name)).toEqual(
       expect.arrayContaining(["K-2A", "K-76"]),
     );
-    expect(PLUGINS.Imaging?.map(([name]) => name)).toContain("K1-Imager");
+    expect(PLUGINS["Imaging"]?.map(([name]) => name)).toContain("K1-Imager");
   });
 
   it("provides at least ten distinct factory voicings for every plugin", () => {

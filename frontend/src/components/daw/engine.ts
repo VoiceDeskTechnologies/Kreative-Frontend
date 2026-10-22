@@ -339,7 +339,11 @@ class Engine {
     this.ready = (async () => {
       const ctx = new AudioContext();
       const url = URL.createObjectURL(new Blob([WORKLET_CODE], { type: "application/javascript" }));
-      await ctx.audioWorklet.addModule(url);
+      try {
+        await ctx.audioWorklet.addModule(url);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
       this.master = ctx.createGain();
       this.masterAnalyser = ctx.createAnalyser();
       this.masterAnalyser.fftSize = SPECTRUM_FFT_SIZE;

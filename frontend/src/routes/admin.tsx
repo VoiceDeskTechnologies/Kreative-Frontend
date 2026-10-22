@@ -1,13 +1,25 @@
 import {
   Ban, ChevronLeft, ChevronRight, CircleDollarSign, FolderKanban, LayoutDashboard,
   LifeBuoy, LoaderCircle, Pencil, Search, Settings, ShieldCheck, UserRound, Users,
+  BarChart3, Cpu, Library,
   X, ArrowUpDown,
 } from "lucide-react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { appConfig } from "@/lib/app-config";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-type Section = "dashboard" | "users" | "payments" | "projects" | "support" | "pricing" | "settings";
+type Section = "dashboard" | "users" | "templates" | "analytics" | "payments" | "system" | "settings" | "support" | "projects" | "pricing";
 type AdminUser = {
   id: string; email?: string; created_at?: string; last_sign_in_at?: string | null;
   banned_until?: string | null; user_metadata?: { display_name?: string };
@@ -30,11 +42,14 @@ type AdminResponse = {
 const sections: Array<{ id: Section; label: string; icon: typeof LayoutDashboard }> = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "users", label: "Users", icon: Users },
+  { id: "templates", label: "Templates", icon: Library },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
   { id: "payments", label: "Payments", icon: CircleDollarSign },
-  { id: "projects", label: "Projects", icon: FolderKanban },
-  { id: "support", label: "Support", icon: LifeBuoy },
-  { id: "pricing", label: "Pricing & Plans", icon: ArrowUpDown },
+  { id: "system", label: "System", icon: Cpu },
   { id: "settings", label: "Settings", icon: Settings },
+  { id: "support", label: "Support", icon: LifeBuoy },
+  { id: "projects", label: "Projects", icon: FolderKanban },
+  { id: "pricing", label: "Pricing & Plans", icon: ArrowUpDown },
 ];
 
 export const Route = createFileRoute("/admin")({
@@ -75,10 +90,17 @@ function AdminPage() {
         const data = await request(`/admin/users?page=${userPage}&limit=25&search=${encodeURIComponent(userSearch)}`);
         setUsers(data.users ?? []);
         setHasMoreUsers(Boolean(data.hasMore));
+      } else if (section === "analytics" || section === "system") {
+        const data = await request(`/admin/${section}`);
+        setRecords([data]);
       } else {
         const endpoint = section === "pricing" ? "pricing" : section;
         const data = await request(`/admin/${endpoint}`);
-        setRecords(section === "support" ? ((data["tickets"] as unknown[]) ?? []) : (data.items ?? data.payments ?? []));
+        setRecords(
+          section === "support"
+            ? ((data["tickets"] as unknown[]) ?? [])
+            : (data.items ?? data.payments ?? []),
+        );
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Unable to load admin data.");
@@ -150,6 +172,8 @@ function AdminPage() {
             section === "dashboard" ? <Dashboard overview={overview} /> :
             section === "users" ? <UsersView users={users} search={userSearch} onSearch={(value) => { setUserPage(1); setUserSearch(value); }} onSelect={setSelectedUser} onAction={updateUser} page={userPage} hasMore={hasMoreUsers} onPage={setUserPage} /> :
             section === "support" ? <SupportQueue tickets={records as AdminTicket[]} request={request} onNotice={setNotice} onError={setError} /> :
+            section === "analytics" ? <AnalyticsView data={(records[0] ?? {}) as Record<string, unknown>} /> :
+            section === "templates" ? <TemplateManager records={records} request={request} onNotice={setNotice} onError={setError} onReload={load} /> :
             <RecordView section={section} records={records} onUpdate={async (id, body) => {
               try { await request(`/admin/${section === "pricing" ? "pricing" : section}/${id}`, { method: "PATCH", body: JSON.stringify(body) }); setNotice("Changes saved."); await load(); }
               catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to save changes."); }
@@ -161,14 +185,151 @@ function AdminPage() {
   );
 }
 
+function AnalyticsView({ data }: { data: Record<string, unknown> }) {
+  const summary = (data["summary"] ?? data) as Record<string, unknown>;
+  const series = Array.isArray(data["series"]) ? data["series"] : [];
+  const chartData = series.map((item) => {
+    const row = item as Record<string, unknown>;
+    return {
+      date: String(row["day"] ?? row["date"] ?? "").slice(5, 10),
+      users: Number(row["user_signups"] ?? 0),
+      templates: Number(row["template_applications"] ?? 0),
+      revenue: Number(row["revenue_usd"] ?? 0),
+    };
+  });
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[
+          ["Template applications", String(summary["template_applications"] ?? "—")],
+          ["Successful payments", String(summary["successful_payments"] ?? "—")],
+          ["Active entitlements", String(summary["active_entitlements"] ?? "—")],
+          ["Recorded failures", String(summary["recorded_failures"] ?? "—")],
+        ].map(([label, value]) => (
+          <div className="rounded-lg border bg-card p-5" key={String(label)}>
+            <div className="text-xs text-muted-foreground">{label}</div>
+            <div className="mt-2 text-2xl font-semibold">{String(value ?? "—")}</div>
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ChartCard title="User registrations">
+          {chartData.length ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={chartData}>
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                <XAxis dataKey="date" stroke="var(--muted-foreground)" />
+                <YAxis allowDecimals={false} stroke="var(--muted-foreground)" />
+                <Tooltip contentStyle={{ background: "var(--popover)", borderColor: "var(--border)" }} />
+                <Line type="monotone" dataKey="users" stroke="var(--primary)" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : <EmptyChart message="No registration history is available yet." />}
+        </ChartCard>
+        <ChartCard title="Template usage and revenue">
+          {chartData.length ? (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={chartData}>
+                <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+                <XAxis dataKey="date" stroke="var(--muted-foreground)" />
+                <YAxis yAxisId="left" allowDecimals={false} stroke="var(--muted-foreground)" />
+                <Tooltip contentStyle={{ background: "var(--popover)", borderColor: "var(--border)" }} />
+                <Bar yAxisId="left" dataKey="templates" fill="var(--primary)" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : <EmptyChart message="No template usage history is available yet." />}
+        </ChartCard>
+      </div>
+    </div>
+  );
+}
+
+function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="rounded-lg border bg-card p-4"><h2 className="mb-3 font-medium">{title}</h2>{children}</section>;
+}
+
+function EmptyChart({ message }: { message: string }) {
+  return <div className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">{message}</div>;
+}
+
+function TemplateManager({
+  records,
+  request,
+  onNotice,
+  onError,
+  onReload,
+}: {
+  records: unknown[];
+  request: (path: string, init?: RequestInit) => Promise<AdminResponse>;
+  onNotice: (message: string) => void;
+  onError: (message: string) => void;
+  onReload: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState(1);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [category, setCategory] = useState("vocal");
+  const [description, setDescription] = useState("");
+  const [pluginChain, setPluginChain] = useState("[]");
+  const templates = records as Array<Record<string, unknown>>;
+  const close = () => {
+    setOpen(false);
+    setStep(1);
+    setName("");
+    setSlug("");
+    setDescription("");
+    setPluginChain("[]");
+  };
+  const save = async () => {
+    try {
+      const parsedChain = JSON.parse(pluginChain) as unknown;
+      if (!Array.isArray(parsedChain)) throw new Error("Processor chain must be a JSON array.");
+      await request("/admin/templates", {
+        method: "POST",
+        body: JSON.stringify({ name, slug, category, description, plugin_chain: parsedChain }),
+      });
+      close();
+      onNotice("Template draft saved.");
+      await onReload();
+    } catch (cause) {
+      onError(cause instanceof Error ? cause.message : "Unable to save template.");
+    }
+  };
+  return (
+    <section className="rounded-lg border bg-card">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
+        <div><div className="font-medium">Audio templates</div><div className="text-xs text-muted-foreground">Drafts and published processing plans</div></div>
+        <button onClick={() => setOpen(true)} className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground">Add Template</button>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm"><thead className="border-b text-xs uppercase tracking-wider text-muted-foreground"><tr><th className="p-4">Name</th><th className="p-4">Category</th><th className="p-4">Version</th><th className="p-4">Status</th></tr></thead>
+          <tbody>          {templates.map((template, index) => <tr className="border-b last:border-0" key={String(template["id"] ?? index)}><td className="p-4 font-medium">{String(template["name"] ?? "Unnamed")}</td><td className="p-4 text-muted-foreground">{String(template["category"] ?? "—")}</td><td className="p-4">{String(template["template_version"] ?? 1)}</td><td className="p-4">{String(template["status"] ?? "draft")}</td></tr>)}</tbody>
+        </table>
+      </div>
+      {!templates.length && <div className="p-8 text-center text-sm text-muted-foreground">No templates found.</div>}
+      {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+        <div className="w-full max-w-xl rounded-lg border bg-card p-5 shadow-2xl">
+          <div className="flex items-center justify-between"><h2 className="font-display text-lg">Add New Template</h2><button onClick={close} aria-label="Close template wizard"><X className="h-4 w-4" /></button></div>
+          <div className="mt-4 text-xs uppercase tracking-wider text-muted-foreground">Step {step} of 3</div>
+          {step === 1 && <div className="mt-4 space-y-3"><label className="block text-sm">Template name<input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded border bg-background p-2" /></label><label className="block text-sm">Slug<input value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))} className="mt-1 w-full rounded border bg-background p-2" /></label><label className="block text-sm">Category<select value={category} onChange={(event) => setCategory(event.target.value)} className="mt-1 w-full rounded border bg-background p-2"><option value="vocal">Vocal</option><option value="vocal-support">Vocal Support</option><option value="two-track-beat">Two-Track Beat</option><option value="full-mix">Full Mix</option><option value="mastering">Mastering</option></select></label><label className="block text-sm">Description<textarea value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 min-h-24 w-full rounded border bg-background p-2" /></label></div>}
+          {step === 2 && <label className="mt-4 block text-sm">Processor chain JSON<textarea value={pluginChain} onChange={(event) => setPluginChain(event.target.value)} className="mt-1 min-h-40 w-full rounded border bg-background p-2 font-mono text-xs" /><span className="mt-1 block text-xs text-muted-foreground">Use the existing plugin identifiers. The backend validates the array shape before persistence.</span></label>}
+          {step === 3 && <div className="mt-4 rounded border p-3 text-sm"><div><span className="text-muted-foreground">Name:</span> {name || "—"}</div><div><span className="text-muted-foreground">Slug:</span> {slug || "—"}</div><div><span className="text-muted-foreground">Category:</span> {category}</div><div><span className="text-muted-foreground">Processors:</span> {pluginChain}</div></div>}
+          <div className="mt-6 flex justify-end gap-2"><button onClick={close} className="rounded border px-3 py-2 text-sm">Cancel</button>{step > 1 && <button onClick={() => setStep(step - 1)} className="rounded border px-3 py-2 text-sm">Back</button>}{step < 3 ? <button disabled={step === 1 && (!name.trim() || !slug.trim())} onClick={() => setStep(step + 1)} className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">Next</button> : <button onClick={() => void save()} className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground">Save Draft</button>}</div>
+        </div>
+      </div>}
+    </section>
+  );
+}
+
 function Dashboard({ overview }: { overview: Overview }) {
   const cards = [
     ["Total users", overview["total_users"] ?? "—", Users],
-    ["Active K-GO", overview["active_k_go"] ?? "—", UserRound],
-    ["Active K-PRO", overview["active_k_pro"] ?? "—", ShieldCheck],
-    ["Completed payments", overview["completed_payments"] ?? "—", CircleDollarSign],
+    ["Active subscriptions", overview["active_subscriptions"] ?? "—", UserRound],
+    ["Published templates", overview["published_templates"] ?? "—", Library],
+    ["Templates used", overview["templates_used"] ?? "—", BarChart3],
+    ["Gross USD revenue", overview["gross_usd_revenue"] ? `$${overview["gross_usd_revenue"]}` : "—", CircleDollarSign],
     ["Expired entitlements", overview["expired_entitlements"] ?? "—", Ban],
-    ["Gross payments", overview["gross_payments"] ? `$${overview["gross_payments"]}` : "—", CircleDollarSign],
   ] as const;
   return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{cards.map(([label, value, Icon]) =>
     <div key={label} className="rounded-lg border bg-card p-5"><Icon className="h-5 w-5 text-primary" /><div className="mt-6 text-xs text-muted-foreground">{label}</div><div className="mt-1 text-2xl font-semibold">{value}</div></div>)}</div>;
