@@ -8,8 +8,15 @@ test("pricing is server-owned and exposes the two one-time tiers", async () => {
   try {
     const response = await app.inject({ method: "GET", url: "/billing/pricing" });
     assert.equal(response.statusCode, 200);
-    assert.deepEqual(response.json().K_GO, { id: "K-GO", price: "39.95", renders: 3 });
-    assert.deepEqual(response.json().K_PRO, { id: "K-PRO", price: "59.95", renders: 6 });
+    const pricing = response.json();
+    assert.equal(pricing.K_GO.id, "K-GO");
+    assert.equal(pricing.K_GO.price, "39.95");
+    assert.equal(pricing.K_GO.renders, 3);
+    assert.ok(Array.isArray(pricing.K_GO.features));
+    assert.equal(pricing.K_PRO.id, "K-PRO");
+    assert.equal(pricing.K_PRO.price, "59.95");
+    assert.equal(pricing.K_PRO.renders, 6);
+    assert.ok(Array.isArray(pricing.K_PRO.features));
   } finally {
     await app.close();
   }

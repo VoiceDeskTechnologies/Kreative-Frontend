@@ -22,7 +22,7 @@ const requestBody = {
         mute: false,
         solo: false,
         inserts: Array(10).fill(null),
-        stats: { peakDb: -3, rmsDb: -18, crest: 15, clips: 0, duration: 120 },
+        stats: { peakDb: -3, truePeakDb: -2.8, rmsDb: -18, crest: 15, clips: 0, duration: 120 },
         fx: { compOn: false, eqBands: [] },
       },
       {
@@ -33,7 +33,7 @@ const requestBody = {
         mute: false,
         solo: false,
         inserts: Array(10).fill(null),
-        stats: { peakDb: -2, rmsDb: -14, crest: 10, clips: 0, duration: 120 },
+        stats: { peakDb: -2, truePeakDb: -1.8, rmsDb: -14, crest: 10, clips: 0, duration: 120 },
         fx: { compOn: false, eqBands: [] },
       },
     ],

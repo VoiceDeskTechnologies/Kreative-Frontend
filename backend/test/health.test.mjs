@@ -63,3 +63,19 @@ test("production requires at least one explicit CORS origin", () => {
     /must include the exact deployed frontend origin/,
   );
 });
+
+test("support and admin routes are registered once during startup", async () => {
+  const app = buildApp(config);
+  try {
+    const userDetail = await app.inject({ method: "GET", url: "/support/tickets/test-ticket" });
+    const userReply = await app.inject({ method: "POST", url: "/support/tickets/test-ticket/reply", payload: {} });
+    const adminDetail = await app.inject({ method: "GET", url: "/admin/support/test-ticket" });
+    const adminReply = await app.inject({ method: "POST", url: "/admin/support/test-ticket/reply", payload: {} });
+    assert.equal(userDetail.statusCode, 401);
+    assert.equal(userReply.statusCode, 401);
+    assert.equal(adminDetail.statusCode, 403);
+    assert.equal(adminReply.statusCode, 403);
+  } finally {
+    await app.close();
+  }
+});

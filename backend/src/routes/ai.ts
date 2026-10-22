@@ -82,6 +82,9 @@ export function registerAiRoutes(
       });
     }
     const now = Date.now();
+    for (const [client, window] of rateWindows) {
+      if (window.expiresAt <= now) rateWindows.delete(client);
+    }
     const client = request.ip;
     const isAdmin = isAdminUser(
       await getAuthenticatedUser(request, config, fetcher),
