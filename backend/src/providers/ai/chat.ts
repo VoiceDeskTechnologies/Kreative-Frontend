@@ -104,6 +104,10 @@ async function callOpenAi(
 ) {
   const projectContext = `Current project metadata:\n${JSON.stringify(input.project)}${
     input.analysis ? `\nCached acoustic analysis:\n${JSON.stringify(input.analysis)}` : ""
+  }${
+    input.sessionAnalysis
+      ? `\nDeterministic browser session analysis:\n${JSON.stringify(input.sessionAnalysis)}`
+      : ""
   }`;
   const conversation = input.conversation.map((message, index) => ({
     role: message.role,
@@ -165,6 +169,10 @@ async function callGemini(
               ? `${message.content}\n\nCurrent project metadata:\n${JSON.stringify(input.project)}${
                   input.analysis
                     ? `\nCached acoustic analysis:\n${JSON.stringify(input.analysis)}`
+                    : ""
+                }${
+                  input.sessionAnalysis
+                    ? `\nDeterministic browser session analysis:\n${JSON.stringify(input.sessionAnalysis)}`
                     : ""
                 }`
               : message.content,

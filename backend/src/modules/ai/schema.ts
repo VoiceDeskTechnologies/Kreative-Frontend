@@ -60,6 +60,49 @@ const Analysis = z
       .strict(),
   })
   .strict();
+const SessionAnalysis = z
+  .object({
+    schemaVersion: z.string().max(20),
+    analysisId: z.string().min(1).max(100),
+    sessionId: z.string().min(1).max(200),
+    createdAt: z.string().max(80),
+    analysisEngine: z.string().max(120),
+    ruleSetVersion: z.string().max(20),
+    status: z.enum(["complete", "partial", "failed"]),
+    sessionSummary: z
+      .object({
+        totalTracks: z.number().int().min(0).max(32),
+        analyzedTracks: z.number().int().min(0).max(32),
+        failedTracks: z.number().int().min(0).max(32),
+        totalDurationSeconds: z.number().finite().min(0).max(86400),
+        criticalIssues: z.number().int().min(0).max(1000),
+        highIssues: z.number().int().min(0).max(1000),
+        mediumIssues: z.number().int().min(0).max(1000),
+        lowIssues: z.number().int().min(0).max(1000),
+      })
+      .strict(),
+    tracks: z
+      .array(
+        z
+          .object({
+            trackId: TrackId,
+            name: z.string().min(1).max(120),
+            role: z.string().min(1).max(80),
+            muted: z.boolean(),
+            soloed: z.boolean(),
+            status: z.enum(["complete", "failed"]),
+            measurements: z.record(z.string(), z.unknown()).optional(),
+            issues: z.array(z.record(z.string(), z.unknown())).max(32),
+            recommendations: z.array(z.string().max(500)).max(12),
+            failureReason: z.string().max(500).optional(),
+          })
+          .strict(),
+      )
+      .max(32),
+    globalIssues: z.array(z.record(z.string(), z.unknown())).max(32),
+    limitations: z.array(z.string().max(500)).max(20),
+  })
+  .strict();
 const EqBand = z
   .object({
     id: z.string().min(1).max(80),
@@ -272,7 +315,7 @@ export const AiChatRequest = z
         z
           .object({
             role: z.enum(["user", "assistant"]),
-            content: z.string().min(1).max(2500),
+              content: z.string().min(1).max(12000),
           })
           .strict(),
       )
@@ -280,6 +323,7 @@ export const AiChatRequest = z
       .max(16),
     project: Project,
     analysis: Analysis.optional(),
+      sessionAnalysis: SessionAnalysis.optional(),
   })
   .strict()
   .refine((request) => request.conversation.at(-1)?.role === "user", {
