@@ -114,8 +114,12 @@ export function registerAiRoutes(
       return await generateAiAudioAnalysis(config, parsed.data, fetcher);
     } catch (error) {
       if (error instanceof AiProviderError) {
+        request.log.warn(
+          { err: error, provider: config.AI_PROVIDER, statusCode: error.statusCode },
+          "AI audio analysis request failed",
+        );
         return reply.code(error.statusCode).send({
-          error: error.message,
+          error: "Audio analysis failed. Please try again.",
           code: error.statusCode === 429 ? "PROVIDER_RATE_LIMITED" : "AI_REQUEST_FAILED",
         });
       }
@@ -225,14 +229,12 @@ export function registerAiRoutes(
       return { message: plan.message, actions: plan.actions };
     } catch (error) {
       if (error instanceof AiProviderError) {
-        if (error.statusCode >= 500) {
-          app.log.warn(
-            { provider: config.AI_PROVIDER, statusCode: error.statusCode },
-            error.message,
-          );
-        }
+        request.log.warn(
+          { err: error, provider: config.AI_PROVIDER, statusCode: error.statusCode },
+          "AI chat request failed",
+        );
         return reply.code(error.statusCode).send({
-          error: error.message,
+          error: "Couldn't complete that request. Please try again.",
           code:
             error.statusCode === 429
               ? "PROVIDER_RATE_LIMITED"

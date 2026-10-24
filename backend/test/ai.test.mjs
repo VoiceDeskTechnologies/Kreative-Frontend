@@ -161,7 +161,7 @@ test("AI mix plans with out-of-range settings are rejected without actions", asy
     });
     assert.equal(response.statusCode, 502);
     assert.equal(response.json().code, "AI_REQUEST_FAILED");
-    assert.match(response.json().error, /No changes were applied/);
+    assert.equal(response.json().error, "Couldn't complete that request. Please try again.");
   } finally {
     await app.close();
   }
@@ -204,7 +204,7 @@ test("AI rejects changes targeting tracks absent from the supplied project", asy
       payload: requestBody,
     });
     assert.equal(response.statusCode, 502);
-    assert.match(response.json().error, /unknown track/i);
+    assert.equal(response.json().error, "Couldn't complete that request. Please try again.");
   } finally {
     await app.close();
   }
