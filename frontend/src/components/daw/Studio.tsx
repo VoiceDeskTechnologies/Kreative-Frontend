@@ -2641,6 +2641,7 @@ export function Studio() {
                   tracks={tracks}
                   selected={sel}
                   masterVolume={masterVol}
+                  sessionName={projectName}
                   canUndo={mixUndo !== null}
                   onApplyActions={applyAiActions}
                   onUndo={undoAiActions}

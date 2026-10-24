@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Clipboard,
+  Copy,
   Check,
+  FileText,
   LoaderCircle,
   Plus,
   RotateCcw,
@@ -11,6 +14,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { appConfig } from "@/lib/app-config";
+import {
+  analyzeSession,
+  formatSessionAnalysisReport,
+  type SessionAnalysisProgress,
+  type SessionAnalysisReport,
+} from "./audio-analysis";
 import {
   parseAiMixPlan,
   parseAiAnalysis,
@@ -40,6 +49,7 @@ export function AssistantPanel({
   tracks,
   selected,
   masterVolume,
+  sessionName,
   canUndo,
   onApplyActions,
   onUndo,
@@ -47,6 +57,7 @@ export function AssistantPanel({
   tracks: TrackState[];
   selected: TrackState | null;
   masterVolume: number;
+  sessionName: string;
   canUndo: boolean;
   onApplyActions: (
     actions: AiMixAction[],
@@ -67,6 +78,14 @@ export function AssistantPanel({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
+  const [sessionReport, setSessionReport] = useState<SessionAnalysisReport | null>(null);
+  const [sessionReportKey, setSessionReportKey] = useState("");
+  const [sessionAnalysisState, setSessionAnalysisState] = useState<
+    "idle" | "running" | "complete" | "partial" | "failed"
+  >("idle");
+  const [sessionAnalysisProgress, setSessionAnalysisProgress] =
+    useState<SessionAnalysisProgress | null>(null);
+  const [showFullReport, setShowFullReport] = useState(false);
   const [analysisKey, setAnalysisKey] = useState("");
   const [reference, setReference] = useState<{
     name: string;
@@ -77,14 +96,27 @@ export function AssistantPanel({
   const feedRef = useRef<HTMLDivElement>(null);
   const textAreaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentTracksRef = useRef(tracks);
+  const analysisRunRef = useRef(0);
+  currentTracksRef.current = tracks;
   const [referenceRevision, setReferenceRevision] = useState(0);
   const currentAnalysisKey = `${tracks
     .map((track) => `${track.id}:${track.buffer.length}:${track.buffer.sampleRate}`)
     .join("|")}|reference:${referenceRevision}`;
+  const currentSessionKey = `${sessionName}|${tracks
+    .map((track) => `${track.id}:${track.buffer.length}:${track.buffer.sampleRate}:${track.buffer.duration}`)
+    .join("|")}`;
 
   useEffect(() => {
     if (analysisKey !== currentAnalysisKey) setAnalysis(null);
   }, [analysisKey, currentAnalysisKey]);
+  useEffect(() => {
+    if (sessionReport && sessionReportKey !== currentSessionKey) {
+      setSessionReport(null);
+      setSessionReportKey("");
+      setSessionAnalysisState("idle");
+    }
+  }, [currentSessionKey, sessionReport, sessionReportKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -120,6 +152,49 @@ export function AssistantPanel({
       ...current,
       { id: crypto.randomUUID(), role: "assistant", content: message, status: "error" },
     ]);
+  };
+
+  const analyzeCurrentSession = async () => {
+    if (sessionAnalysisState === "running") return;
+    if (!tracks.length) {
+      toast.error("Add audio before analyzing the session.");
+      setSessionAnalysisState("failed");
+      return;
+    }
+    const run = analysisRunRef.current + 1;
+    analysisRunRef.current = run;
+    const tracksAtStart = [...tracks];
+    const keyAtStart = currentSessionKey;
+    setSessionAnalysisState("running");
+    setSessionAnalysisProgress({ completed: 0, total: tracksAtStart.filter((track) => track.kind !== "bus").length, trackName: "" });
+    try {
+      const report = await analyzeSession(tracksAtStart, sessionName, (progress) => {
+        if (analysisRunRef.current === run) setSessionAnalysisProgress(progress);
+      });
+      const currentKey = `${sessionName}|${currentTracksRef.current
+        .map((track) => `${track.id}:${track.buffer.length}:${track.buffer.sampleRate}:${track.buffer.duration}`)
+        .join("|")}`;
+      if (analysisRunRef.current !== run || currentKey !== keyAtStart) {
+        setSessionAnalysisState("failed");
+        toast.error("The session changed while analysis was running. Please analyze again.");
+        return;
+      }
+      setSessionReport(report);
+      setSessionReportKey(keyAtStart);
+      setDraft((current) => {
+        const reportText = formatSessionAnalysisReport(report);
+        return current.trim()
+          ? `${current.trim()}\n\n--- SESSION ANALYSIS REPORT ---\n${reportText}`
+          : reportText;
+      });
+      setSessionAnalysisState(report.status === "partial" ? "partial" : report.status === "complete" ? "complete" : "failed");
+      toast.success(report.status === "partial" ? "Analysis complete with warnings." : "Session analysis complete.");
+    } catch {
+      if (analysisRunRef.current === run) {
+        setSessionAnalysisState("failed");
+        toast.error("Session analysis failed. Please try again.");
+      }
+    }
   };
 
   const chooseReference = async (file: File) => {
@@ -167,7 +242,7 @@ export function AssistantPanel({
 
     try {
       let cachedAnalysis = analysis;
-      if (!cachedAnalysis || analysisKey !== currentAnalysisKey) {
+      if (!sessionReport && (!cachedAnalysis || analysisKey !== currentAnalysisKey)) {
         const project = snapshotProject(tracks, selected?.id ?? null, masterVolume);
         const analysisResponse = await fetch(`${appConfig.apiBaseUrl}/ai/analyze`, {
           method: "POST",
@@ -201,6 +276,7 @@ export function AssistantPanel({
             .map(({ role, content }) => ({ role, content })),
           project: snapshotProject(tracks, selected?.id ?? null, masterVolume),
           analysis: cachedAnalysis,
+          ...(sessionReport ? { sessionAnalysis: sessionReport } : {}),
         }),
       });
       const body: unknown = await response.json();
@@ -300,6 +376,64 @@ export function AssistantPanel({
           Checking assistant availability…
         </div>
       )}
+      <div className="border-b px-3 py-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="daw-btn flex h-7 items-center gap-1.5 px-2 text-[9px] text-primary"
+            onClick={() => void analyzeCurrentSession()}
+            disabled={sessionAnalysisState === "running" || busy || !tracks.length}
+          >
+            {sessionAnalysisState === "running" ? (
+              <LoaderCircle className="h-3 w-3 animate-spin" />
+            ) : (
+              <Clipboard className="h-3 w-3" />
+            )}
+            {sessionAnalysisState === "running"
+              ? `Analyzing ${sessionAnalysisProgress?.completed ?? 0} / ${sessionAnalysisProgress?.total ?? 0} tracks...`
+              : sessionAnalysisState === "partial"
+                ? "Analysis Complete with Warnings"
+                : sessionAnalysisState === "complete"
+                  ? "Re-analyze Session"
+                  : sessionAnalysisState === "failed"
+                    ? "Analysis Failed"
+                    : "Analyze Session"}
+          </button>
+          {sessionReport && (
+            <>
+              <button
+                type="button"
+                className="daw-btn flex h-7 items-center gap-1 px-2 text-[9px]"
+                onClick={() => setShowFullReport(true)}
+                title="View full report"
+              >
+                <FileText className="h-3 w-3" />
+                View Report
+              </button>
+              <button
+                type="button"
+                className="daw-btn grid h-7 w-7 place-items-center"
+                onClick={() => void navigator.clipboard.writeText(formatSessionAnalysisReport(sessionReport))}
+                aria-label="Copy report"
+                title="Copy report"
+              >
+                <Copy className="h-3 w-3" />
+              </button>
+            </>
+          )}
+        </div>
+        {sessionAnalysisProgress?.trackName && sessionAnalysisState === "running" && (
+          <div className="mt-1 text-[8px] text-muted-foreground">
+            Measuring {sessionAnalysisProgress.trackName}
+          </div>
+        )}
+        {sessionReport && (
+          <div className="mt-1 text-[8px] text-muted-foreground">
+            {sessionReport.sessionSummary.analyzedTracks}/{sessionReport.sessionSummary.totalTracks} tracks ·{" "}
+            {sessionReport.sessionSummary.criticalIssues + sessionReport.sessionSummary.highIssues} high-priority issues
+          </div>
+        )}
+      </div>
       {(statusError || status?.available === false) && (
         <div className="border-b border-meter-mid/25 bg-meter-mid/5 px-3 py-2 text-[9px] leading-relaxed text-muted-foreground">
           The mix assistant is temporarily unavailable. Please try again later.
@@ -408,8 +542,8 @@ export function AssistantPanel({
               }
             }}
             placeholder="Describe the mix change you want…"
-            maxLength={2500}
-            rows={3}
+            maxLength={12000}
+            rows={6}
             className="w-full resize-none bg-transparent p-1 text-[10px] outline-none placeholder:text-muted-foreground"
             disabled={busy}
           />
@@ -452,6 +586,27 @@ export function AssistantPanel({
                 Send
               </button>
             </div>
+            {showFullReport && sessionReport && (
+              <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/80 p-3">
+                <section className="flex max-h-full w-full max-w-xl flex-col rounded border bg-panel shadow-xl">
+                  <div className="flex items-center justify-between border-b p-3">
+                    <div className="text-xs font-medium">Session analysis report</div>
+                    <button
+                      type="button"
+                      className="daw-btn grid h-7 w-7 place-items-center"
+                      onClick={() => setShowFullReport(false)}
+                      aria-label="Close report"
+                      title="Close report"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap p-3 text-[9px] leading-relaxed">
+                    {formatSessionAnalysisReport(sessionReport)}
+                  </pre>
+                </section>
+              </div>
+            )}
           </div>
         </div>
         <div className="mt-1 text-[8px] text-muted-foreground">
