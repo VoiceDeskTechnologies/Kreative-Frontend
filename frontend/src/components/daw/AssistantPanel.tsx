@@ -185,35 +185,7 @@ export function AssistantPanel({
         });
         const analysisBody: unknown = await analysisResponse.json();
         if (!analysisResponse.ok) {
-          const message =
-            analysisBody &&
-            typeof analysisBody === "object" &&
-            "error" in analysisBody &&
-            typeof analysisBody.error === "string"
-              ? `${analysisBody.error}${
-                  "details" in analysisBody &&
-                  Array.isArray(analysisBody.details) &&
-                  analysisBody.details.length
-                    ? ` ${analysisBody.details
-                        .map((detail) => {
-                          if (
-                            detail &&
-                            typeof detail === "object" &&
-                            "path" in detail &&
-                            "message" in detail &&
-                            typeof detail.path === "string" &&
-                            typeof detail.message === "string"
-                          ) {
-                            return `${detail.path}: ${detail.message}`;
-                          }
-                          return null;
-                        })
-                        .filter((detail): detail is string => detail !== null)
-                        .join("; ")}`
-                    : ""
-                }`
-              : `Audio analysis failed (${analysisResponse.status}).`;
-          throw new Error(message);
+          throw new Error("Audio analysis failed. Please try again.");
         }
         cachedAnalysis = parseAiAnalysis(analysisBody);
         setAnalysis(cachedAnalysis);
@@ -233,11 +205,7 @@ export function AssistantPanel({
       });
       const body: unknown = await response.json();
       if (!response.ok) {
-        const message =
-          body && typeof body === "object" && "error" in body && typeof body.error === "string"
-            ? body.error
-            : `AI request failed (${response.status}).`;
-        throw new Error(message);
+        throw new Error("Couldn't complete that request. Please try again.");
       }
 
       const plan = parseAiMixPlan(body);

@@ -895,8 +895,8 @@ class Engine {
         if (!n.routeGains.has(targetId)) {
           n.routeGains.set(targetId, routeGain);
           routeGain.connect(target.input);
+          n.output.connect(routeGain);
         }
-        n.output.connect(routeGain);
         set(routeGain.gain, audible ? dbToGain(level) : 0);
       }
     }
