@@ -78,6 +78,15 @@ export function AccountMenu() {
       });
   }, [token]);
 
+  useEffect(() => {
+    const openPricingFromFeature = () => {
+      setOpen(false);
+      setModal("pricing");
+    };
+    window.addEventListener("kreative:open-pricing", openPricingFromFeature);
+    return () => window.removeEventListener("kreative:open-pricing", openPricingFromFeature);
+  }, []);
+
   const logout = () => {
     localStorage.removeItem("kreative.auth.token");
     localStorage.removeItem("kreative.auth.user");

@@ -50,6 +50,7 @@ import { AnalysisPanel } from "./AnalysisPanel";
 import { SettingsModal, type Settings } from "./SettingsModal";
 import { MixerFader } from "./MixerFader";
 import { AssistantPanel } from "./AssistantPanel";
+import { SoundMatchPanel } from "./SoundMatchPanel";
 import type { AiMixAction } from "./ai-mix-types";
 import {
   describeAiAction,
@@ -2509,7 +2510,7 @@ export function Studio() {
                 >
                   <PanelRightClose className="h-3 w-3" />
                 </button>
-                {["PLUGINS", "AI ASSISTANT", "ANALYSIS"].map((t) => (
+                {["PLUGINS", "AI ASSISTANT", "SOUND MATCH", "ANALYSIS"].map((t) => (
                   <button
                     key={t}
                     onClick={() => setTab(t)}
@@ -2636,6 +2637,13 @@ export function Studio() {
                 </>
               )}
               {tab === "ANALYSIS" && <AnalysisPanel tracks={tracks} selected={sel} />}
+              {tab === "SOUND MATCH" && (
+                <SoundMatchPanel
+                  tracks={tracks}
+                  isPro={billingUsage?.plan === "K-PRO"}
+                  onApplyActions={applyAiActions}
+                />
+              )}
               {tab === "AI ASSISTANT" && (
                 <AssistantPanel
                   tracks={tracks}

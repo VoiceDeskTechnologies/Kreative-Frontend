@@ -73,6 +73,10 @@ export type SessionAnalysisProgress = {
   trackName: string;
 };
 
+export async function analyzeAudioBuffer(buffer: AudioBuffer): Promise<SessionTrackMeasurements> {
+  return measureWithEssentia(buffer);
+}
+
 export type AudioIssue = {
   code: "clipping" | "headroom" | "true-peak" | "quiet" | "dynamic" | "compressed" | "dc-offset";
   message: string;
